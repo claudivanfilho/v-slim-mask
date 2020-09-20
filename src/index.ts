@@ -48,14 +48,12 @@ export const getMaskDirectiveCustom = (
         Boolean(shouldUnmask),
         Boolean(parseint),
         (value: string | number) => {
-          if (bindings?.instance?.$data) {
-            if (bindings.instance.$data[model]) {
-              bindings.instance.$data[model] = value
-            } else if (bindings.instance[model]) {
-              bindings.instance[model] = value
-            } else if (bindings.instance.state[model]) {
-              bindings.instance.state[model] = value
-            }
+          if (bindings.instance.$data[model]) {
+            bindings.instance.$data[model] = value
+          } else if (bindings.instance[model]) {
+            bindings.instance[model] = value
+          } else if (bindings.instance.state[model]) {
+            bindings.instance.state[model] = value
           }
         },
         tokens
