@@ -9,7 +9,7 @@ A incredibly lighter input mask directive and filter compatible with **Vue 3**
 ![Min Gziped](https://badgen.net/bundlephobia/minzip/v-slim-mask)
 
 ![Travis Build](https://travis-ci.org/claudivanfilho/v-slim-mask.svg?branch=master)
-[![Known Vulnerabilities](https://snyk.io/test/github/claudivanfilho/v-mask-directive-filter/badge.svg?targetFile=package.json)](https://snyk.io/test/github/claudivanfilho/v-slim-mask?targetFile=package.json)
+[![Known Vulnerabilities](https://snyk.io/test/github/claudivanfilho/v-slim-mask/badge.svg?targetFile=package.json)](https://snyk.io/test/github/claudivanfilho/v-slim-mask?targetFile=package.json)
 
 ## Instalation
 
@@ -91,8 +91,10 @@ createApp(App).directive('mask', VMaskDirective).mount('#app')
 ```javascript
 
 <script>
-  import { maskTransform, unmaskTransform } from 'v-mask-directive-filter'
-  export default Vue.extends({
+  import { defineComponent } from "vue";
+  import { maskTransform, unmaskTransform } from 'v-slim-mask'
+
+  export default defineComponent({
     computed: {
       phoneFormatted(val) {
         return maskTransform(val, '(NN) NNNNN - NNNN')
