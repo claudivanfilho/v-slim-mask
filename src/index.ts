@@ -17,7 +17,6 @@ export const getMaskDirectiveCustom = (
 ): Directive => {
   return {
     mounted: (el, bindings: any, vnode) => {
-      console.log({ el, bindings })
       const mask = bindings.value.mask
       const model: string = bindings.value.model
       const shouldUnmask = bindings.modifiers.unmask

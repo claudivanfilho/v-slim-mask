@@ -26,7 +26,7 @@ $ npm install --save v-slim-mask
 ```javascript
 // Import the directive inside your main.(js|ts)
 
-import { VMaskDirective } from 'v-slim'
+import { VMaskDirective } from 'v-slim-mask'
 
 createApp(App).directive('mask', VMaskDirective).mount('#app')
 ```
