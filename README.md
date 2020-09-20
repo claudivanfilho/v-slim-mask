@@ -59,7 +59,7 @@ createApp(App).directive('mask', VMaskDirective).mount('#app')
 // Inside your .vue component
 
 <template>
-  <input v-model="cpf" v-mask="{mask: 'NNN.NNN.NNN-NN', model: 'cpf' }" />
+  <input v-mask="{mask: 'NNN.NNN.NNN-NN', model: 'cpf' }" />
 </template>
 
 // Entry => 99999999999 | cpf => "999.999.999-99"
@@ -69,10 +69,7 @@ createApp(App).directive('mask', VMaskDirective).mount('#app')
 
 ```html
 <template>
-  <BaseInputComponent
-    :myfield="cpf"
-    v-mask="{mask: 'NNN.NNN.NNN-NN', model: 'cpf' }"
-  />
+  <BaseInputComponent v-mask="{mask: 'NNN.NNN.NNN-NN', model: 'cpf' }" />
 </template>
 
 // BaseInputComponent.vue
