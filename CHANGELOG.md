@@ -1,4 +1,8 @@
-# v1.0.7
+# v1.0.8
+
+- Fix reactive|ref
+
+## v1.0.7
 
 - Add support to composition API
 

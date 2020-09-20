@@ -110,6 +110,7 @@ createApp(App).directive('mask', VMaskDirective).mount('#app')
 ### Using Composition API
 
 ```html
+// using reactive
 <template>
   <input v-mask="{mask: 'NNN.NNN.NNN-NN', model: 'cpf' }" />
 </template>
@@ -118,14 +119,29 @@ createApp(App).directive('mask', VMaskDirective).mount('#app')
   import { reactive } from 'vue'
   export default {
     setup() {
-      const cpf = reactive({
-        cpf: '',
+      const state = reactive({
+        cpf: '', // cannot be undefined
       })
 
-      return {
-        cpf,
-      }
-      // also can be used => return { state: cpf }
+      return state
+    },
+  }
+</script>
+
+// Entry => 99999999999 | cpf => "999.999.999-99"
+```
+
+```html
+// using ref
+<template>
+  <input v-mask="{mask: 'NNN.NNN.NNN-NN', model: 'cpf' }" />
+</template>
+
+<script>
+  import { ref } from 'vue'
+  export default {
+    setup() {
+      return { cpf: ref('') } // cannot be undefined
     },
   }
 </script>
