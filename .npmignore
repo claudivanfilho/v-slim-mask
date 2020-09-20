@@ -1,0 +1,15 @@
+__tests__
+.vscode
+coverage
+node_modules
+
+src
+.env
+.gitignore
+.prettierrc
+.travis.yml
+babel.config.js
+CHANGELOG.md
+jestconfig.json
+tsconfig.json
+tslint.json

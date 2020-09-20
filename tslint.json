@@ -1,0 +1,26 @@
+{
+  "extends": [],
+  "rules": {
+    "quotemark": [true, "single"],
+    "indent": [true, "spaces", 2],
+    "interface-name": false,
+    "ordered-imports": false,
+    "object-literal-sort-keys": false,
+    "no-consecutive-blank-lines": false,
+    "no-console": false,
+    "member-access": false,
+    "max-line-length": false,
+    "trailing-comma": false,
+    "semicolon": false,
+    "variable-name": false,
+    "no-unused-expression": false,
+    "arrow-parens": false,
+    "prefer-for-of": false,
+    "interface-over-type-literal": false,
+    "no-debugger": false,
+    "no-string-literal": false,
+    "only-arrow-functions": false,
+    "max-len": ["error", 80]
+  },
+  "defaultSeverity": "error"
+}
