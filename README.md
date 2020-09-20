@@ -62,6 +62,17 @@ createApp(App).directive('mask', VMaskDirective).mount('#app')
   <input v-mask="{mask: 'NNN.NNN.NNN-NN', model: 'cpf' }" />
 </template>
 
+<script>
+  import { defineComponent } from 'vue'
+  export default defineComponent({
+    data() {
+      return {
+        cpf: '',
+      }
+    },
+  })
+</script>
+
 // Entry => 99999999999 | cpf => "999.999.999-99"
 ```
 
@@ -72,6 +83,21 @@ createApp(App).directive('mask', VMaskDirective).mount('#app')
   <BaseInputComponent v-mask="{mask: 'NNN.NNN.NNN-NN', model: 'cpf' }" />
 </template>
 
+<script>
+  import { defineComponent } from 'vue'
+  export default defineComponent({
+    data() {
+      return {
+        cpf: '',
+      }
+    },
+  })
+</script>
+
+// Entry => 99999999999 | cpf => "999.999.999-99"
+```
+
+```html
 // BaseInputComponent.vue
 <template>
   <div>
@@ -79,8 +105,6 @@ createApp(App).directive('mask', VMaskDirective).mount('#app')
     <input />
   </div>
 </template>
-
-// Entry => 99999999999 | cpf => "999.999.999-99"
 ```
 
 ### Using helper functions
