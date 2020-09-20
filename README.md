@@ -107,6 +107,42 @@ createApp(App).directive('mask', VMaskDirective).mount('#app')
 </template>
 ```
 
+### Using Composition API
+
+```html
+<template>
+  <input v-mask="{mask: 'NNN.NNN.NNN-NN', model: 'cpf' }" />
+</template>
+
+<script>
+  import { reactive } from 'vue'
+  export default {
+    setup() {
+      const cpf = reactive({
+        cpf: '',
+      })
+
+      return {
+        cpf,
+      }
+      // also can be used => return { state: cpf }
+    },
+  }
+</script>
+
+// Entry => 99999999999 | cpf => "999.999.999-99"
+```
+
+```html
+// BaseInputComponent.vue
+<template>
+  <div>
+    <label>Base label</label>
+    <input />
+  </div>
+</template>
+```
+
 ### Using helper functions
 
 ```javascript

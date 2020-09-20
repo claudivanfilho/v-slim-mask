@@ -1,4 +1,8 @@
-# v1.0.2
+# v1.0.7
+
+- Add support to composition API
+
+## v1.0.2
 
 - Update documentation
 
