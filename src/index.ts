@@ -121,7 +121,20 @@ class InputMask {
   initListeners() {
     this.inputElement.onkeydown = (event: any) => {
       const key = event.key
-      if (['ArrowRight', 'ArrowLeft', 'Tab', 'Meta'].includes(key)) {
+      if (
+        [
+          'ArrowRight',
+          'ArrowLeft',
+          'Tab',
+          'Meta',
+          'Enter',
+          'Shift',
+          'Alt',
+          'Escape',
+          'CapsLock',
+          'Dead',
+        ].includes(key)
+      ) {
         return
       }
       event.preventDefault()
