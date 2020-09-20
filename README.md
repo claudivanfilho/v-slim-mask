@@ -105,8 +105,6 @@ createApp(App).directive('mask', VMaskDirective).mount('#app')
 
 ## Demo
 
-**vue 3.x sample**
+### Vue 3.0.0 Sample
 
-:soon:
-
-<!-- https://codesandbox.io/s/flamboyant-kilby-xv8hz -->
+https://codesandbox.io/s/vue-3-v-slim-mask-wy3po?file=/src/App.vue
