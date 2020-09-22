@@ -17,7 +17,7 @@ export const MASK_TOKEN_PATTERN: IMASK_TOKEN_PATTERN = {
   N: /[0-9]/,
   S: /[a-z]|[A-Z]/,
   A: /[0-9]|[a-z]|[A-Z]/,
-  X: /.*/
+  X: /.*/,
 }
 export type MASK_TOKEN = keyof typeof MASK_TOKEN_PATTERN
 
@@ -33,7 +33,7 @@ const GHOST_KEYS = [
   'Escape',
   'CapsLock',
   'Dead',
-  'Meta'
+  'Meta',
 ]
 const BLOCKED_KEYS = ['Backspace', 'Dead']
 const GHOST_COMBO_KEYS = ['c', 'v', 'z', 'a', 'x']
@@ -83,7 +83,7 @@ export function getCustomMaskDirective(
           }
         }
       )
-    }
+    },
   }
 }
 
@@ -215,7 +215,7 @@ class InputMaskDOMManiputalion {
     const nextkey = this.maskService.getNextMaskKey(maskedUntilIndexWithChar)
     return {
       index: nextkey?.index || this.mask.length,
-      text: newValue
+      text: newValue,
     }
   }
 
@@ -339,7 +339,7 @@ class MaskLogic {
       if (value[i] === ' ' && this.mapTokens[this.mask[i]]) {
         return {
           token: this.mask[i],
-          index: i
+          index: i,
         }
       }
     }
@@ -348,7 +348,7 @@ class MaskLogic {
   onClickInput(value: string, selectionIndex: number) {
     const nextMaskKey = this.getNextMaskKey(value)
     return {
-      selectionIndex: nextMaskKey?.index || selectionIndex
+      selectionIndex: nextMaskKey?.index || selectionIndex,
     }
   }
 
@@ -380,17 +380,18 @@ class MaskLogic {
 }
 
 export function unmaskTransform(
+  value: string,
   mask: string,
   mapTokens = MASK_TOKEN_PATTERN,
   parseToInt = false
 ) {
-  return new MaskLogic(mask, mapTokens, parseToInt).unmaskTransform
+  return new MaskLogic(mask, mapTokens, parseToInt).unmaskTransform(value)
 }
 
 export function maskTransform(
+  value: string,
   mask: string,
-  mapTokens = MASK_TOKEN_PATTERN,
-  parseToInt = false
+  mapTokens = MASK_TOKEN_PATTERN
 ) {
-  return new MaskLogic(mask, mapTokens, parseToInt).maskTransform
+  return new MaskLogic(mask, mapTokens, false).maskTransform(value)
 }
