@@ -1,18 +1,27 @@
 import { Directive } from 'vue'
 
-export const MASK_TOKEN_PATTERN = {
-  N: /[0-9]/,
-  S: /[a-z]|[A-Z]/,
-  A: /[0-9]|[a-z]|[A-Z]/,
-  X: /.*/,
+interface EventInputTarget {
+  target: HTMLInputElement
 }
-export type MASK_TOKEN = keyof typeof MASK_TOKEN_PATTERN
 
-type IMASK_TOKEN_PATTERN = {
+type KeyboardInputEvent = Omit<KeyboardEvent, 'target'> & EventInputTarget
+type FocusInputEvent = Omit<FocusEvent, 'target'> & EventInputTarget
+type MouseInputEvent = Omit<MouseEvent, 'target'> & EventInputTarget
+type ClipboardInputEvent = Omit<ClipboardEvent, 'target'> & EventInputTarget
+
+export type IMASK_TOKEN_PATTERN = {
   [key: string]: RegExp
 }
 
-const KEYBOARD_GHOST_KEYS = [
+export const MASK_TOKEN_PATTERN: IMASK_TOKEN_PATTERN = {
+  N: /[0-9]/,
+  S: /[a-z]|[A-Z]/,
+  A: /[0-9]|[a-z]|[A-Z]/,
+  X: /.*/
+}
+export type MASK_TOKEN = keyof typeof MASK_TOKEN_PATTERN
+
+const GHOST_KEYS = [
   'ArrowUp',
   'ArrowDown',
   'ArrowRight',
@@ -24,26 +33,19 @@ const KEYBOARD_GHOST_KEYS = [
   'Escape',
   'CapsLock',
   'Dead',
-  'Meta',
+  'Meta'
 ]
-
-const KEYS_BLOCKED = ['Backspace', 'Dead']
-
-const KEYBOARD_PRESSED_KEYS = [
-  'Meta',
-  'Control',
-  'Shift',
-  'ArrowRight',
-  'ArrowLeft',
-]
+const BLOCKED_KEYS = ['Backspace', 'Dead']
+const GHOST_COMBO_KEYS = ['c', 'v', 'z', 'a', 'x']
+const PRESSED_KEYS = ['Meta', 'Control', 'Shift', 'ArrowRight', 'ArrowLeft']
 
 export function getCustomMaskDirective(
-  mapTokens: IMASK_TOKEN_PATTERN = MASK_TOKEN_PATTERN
+  mapTokens = MASK_TOKEN_PATTERN
 ): Directive {
   return {
-    mounted: (el: any, bindings: any, vnode: any) => {
+    mounted: (el, bindings: any, vnode) => {
       const mask = bindings.value.mask
-      const model: string = bindings.value.model
+      const model = bindings.value.model
       const shouldUnmask = bindings.modifiers.unmask
       const parseint = bindings.modifiers.parseint
       const initChange = bindings.modifiers['init-change']
@@ -57,9 +59,8 @@ export function getCustomMaskDirective(
       if (!mask) {
         throw new Error('Mask not provided')
       }
-      new InputMask(
+      new InputMaskDOMManiputalion(
         mapTokens,
-        isNativeInput,
         inputElement,
         mask,
         Boolean(shouldUnmask),
@@ -68,115 +69,101 @@ export function getCustomMaskDirective(
         initChange,
         (value: string | number) => {
           if (
-            bindings.instance?.$data &&
-            bindings.instance?.$data[model] !== undefined
+            bindings.instance.$data &&
+            bindings.instance.$data[model] !== undefined
           ) {
             bindings.instance.$data[model] = value
           } else if (bindings.instance[model] !== undefined) {
             bindings.instance[model] = value
           } else if (
-            bindings.instance?.state &&
-            bindings.instance?.state[model] !== undefined
+            bindings.instance.state &&
+            bindings.instance.state[model] !== undefined
           ) {
             bindings.instance.state[model] = value
           }
         }
       )
-    },
+    }
   }
 }
 
 export const VMaskDirective: Directive = getCustomMaskDirective()
 
-class InputMask {
+class InputMaskDOMManiputalion {
   private isKeyboardEvent = false
+  private maskService: MaskLogic
   constructor(
-    private mapTokens: IMASK_TOKEN_PATTERN = MASK_TOKEN_PATTERN,
-    private isNativeInput: boolean,
+    mapTokens = MASK_TOKEN_PATTERN,
     private inputElement: HTMLInputElement,
     private mask: string,
     private shouldUnmask: boolean,
     private parseint: boolean,
     private hideOnEmpty: boolean,
-    private initChange: boolean,
+    initChange: boolean,
     private updateModel: (value: string | number) => void
   ) {
-    this.refreshInput(
-      maskTransform(inputElement.value, mask, mapTokens),
-      null,
-      0,
-      true
-    )
+    this.maskService = new MaskLogic(mask, mapTokens, parseint)
+    const masked = this.maskService.maskTransform(inputElement.value)
+    this.refreshInput(masked, null, 0, true)
     if (initChange) {
-      this.formatAndEmit(maskTransform(inputElement.value, mask, mapTokens))
+      this.formatAndEmit(masked)
     }
     this.initListeners()
   }
 
-  /**
-   * Updates the input element with the text masked
-   *
-   * @param text text masked
-   * @param event (optional) click, blur or focus event
-   * @param putIntoTimeout (default is false) Necessary to vuetify use with unmask active
-   */
   refreshInput(
     text: string,
-    event?: MouseEvent | FocusEvent | KeyboardEvent | null,
+    event?:
+      | MouseInputEvent
+      | FocusInputEvent
+      | KeyboardInputEvent
+      | ClipboardInputEvent
+      | null,
     selectionIndex = 0,
     putIntoTimeout = false
   ) {
-    const mustUpdate =
-      !this.hideOnEmpty || text !== trimMaskedText(this.mask, 0, this.mapTokens)
+    const hasModifications =
+      text !== this.maskService.trimMaskedText(this.mask, 0)
+    const mustUpdate = !this.hideOnEmpty || hasModifications
+    const eventType = event?.type
     const action = () => {
-      const inputElement: HTMLInputElement =
-        (event?.target as HTMLInputElement) || this.inputElement
-      if (mustUpdate) {
-        inputElement.value = text
-      } else {
-        inputElement.value = ''
-      }
+      const inputElement = event?.target || this.inputElement
+      inputElement.value = mustUpdate ? text : ''
       const newSelectionIndex =
-        event?.type === 'click' || event?.type === 'focus'
-          ? onClickInput(
+        eventType === 'click' || eventType === 'focus'
+          ? this.maskService.onClickInput(
               text,
-              this.mask,
-              inputElement.selectionStart || 0,
-              this.mapTokens
+              inputElement.selectionStart || 0
             ).selectionIndex
           : selectionIndex
       inputElement.selectionStart = newSelectionIndex
       inputElement.selectionEnd = newSelectionIndex
     }
-    if (putIntoTimeout || (!mustUpdate && event?.type === 'keyup')) {
+    if (putIntoTimeout || (!mustUpdate && eventType === 'keyup')) {
       setTimeout(() => action(), 0)
     } else {
       action()
     }
   }
 
-  onKeyUp = (event: any) => {
+  onKeyUp = (event: KeyboardInputEvent) => {
     const key = event.key
-    const start = event.target.selectionStart
-    const end = event.target.selectionEnd
+    const start = event.target.selectionStart || 0
+    const end = event.target.selectionEnd || 0
     const diff = Math.abs(start - end)
+    const isNotSelectionEvent = diff === 0
     if (key === 'Backspace') {
-      const newSelectionStart = diff === 0 ? start - 1 : start
-      const newText = replaceAtRange(
+      const newSelectionStart = isNotSelectionEvent ? start - 1 : start
+      const newText = this.maskService.replaceAtRange(
         event.target.value,
-        Array(diff === 0 ? 1 : diff)
+        Array(isNotSelectionEvent ? 1 : diff)
           .fill(' ')
           .join(''),
         newSelectionStart,
         end
       )
-      const unmasked = unmaskTransform(
-        newText,
-        this.mask,
-        false,
-        this.mapTokens
-      ) as string
-      const text = maskTransform(unmasked, this.mask, this.mapTokens)
+      const unmasked = this.maskService.unmaskTransform(newText) as string
+      const text = this.maskService.maskTransform(unmasked)
       this.refreshInput(
         text,
         event,
@@ -184,103 +171,124 @@ class InputMask {
         this.shouldUnmask
       )
       this.formatAndEmit(this.hideOnEmpty && !unmasked.length ? '' : text)
-    } else if (diff === 0) {
-      const unmask = unmaskTransform(
-        event.target.value,
-        this.mask,
-        false,
-        this.mapTokens
+    } else if (isNotSelectionEvent) {
+      const unmask = this.maskService.unmaskTransform(
+        event.target.value
       ) as string
-      const masked = maskTransform(unmask, this.mask, this.mapTokens)
+      const masked = this.maskService.maskTransform(unmask)
       const diffText = masked.length - event.target.value.length
       this.refreshInput(
         masked,
         event,
-        diffText === 0 ? start : start - Math.abs(diffText)
+        isNotSelectionEvent ? start : start - Math.abs(diffText)
       )
     }
-    if (KEYBOARD_PRESSED_KEYS.includes(key)) {
+    if (PRESSED_KEYS.includes(key)) {
       this.isKeyboardEvent = false
     }
   }
 
-  onKeyDown = (event: any) => {
-    const key = event.key
-    if (!this.isKeyboardEvent && KEYBOARD_PRESSED_KEYS.includes(key)) {
-      this.isKeyboardEvent = true
-    }
-    if (this.isKeyboardEvent && key === 'v') {
-      return
-    }
-    if (!this.isKeyboardEvent && !KEYBOARD_GHOST_KEYS.includes(key)) {
-      event.preventDefault()
-    }
-    if (!KEYBOARD_GHOST_KEYS.includes(key) && !KEYS_BLOCKED.includes(key)) {
-      const { value, selectionIndex: newSelectionIndex } = onAddCharToMask(
-        this.parseint
-          ? maskTransform(event.target.value, this.mask, this.mapTokens)
-          : maskTransform(
-              unmaskTransform(event.target.value, this.mask) as string,
-              this.mask
-            ),
-        this.mask,
-        event?.target.selectionStart || 0,
-        key,
-        this.mapTokens
-      )
-      this.refreshInput(value, event, newSelectionIndex, this.shouldUnmask)
-      this.formatAndEmit(value)
+  appendTextAtIndex(originalText: string, text: string, index: number) {
+    return (
+      originalText.substring(0, index) + text + originalText.substring(index)
+    )
+  }
+
+  getValueAndIndexAfterInsertAt(
+    text: string,
+    index: number,
+    textToInsert: string
+  ) {
+    const unmaskAll = this.maskService.unmaskTransform(text) as string
+    const unmaskUntilIndex = this.maskService.unmaskTransform(
+      text.substr(0, index)
+    ) as string
+    const maskedUntilIndexWithChar = this.maskService.maskTransform(
+      unmaskUntilIndex + textToInsert
+    )
+    const valueWithChar = this.appendTextAtIndex(
+      unmaskAll,
+      textToInsert,
+      unmaskUntilIndex.length
+    )
+    const newValue = this.maskService.maskTransform(valueWithChar)
+    const nextkey = this.maskService.getNextMaskKey(maskedUntilIndexWithChar)
+    return {
+      index: nextkey?.index || this.mask.length,
+      text: newValue
     }
   }
 
-  onPaste = async (event: any) => {
-    let text = this.shouldUnmask
-      ? event?.target?.value
-      : unmaskTransform(event?.target?.value, this.mask, false, this.mapTokens)
-    if (event.type === 'paste') {
-      const clipboard = await navigator.clipboard.readText()
-      if (clipboard.length === this.mask.length) {
-        const unmask = unmaskTransform(
-          clipboard,
-          this.mask,
-          false,
-          this.mapTokens
-        ) as string
-        text = maskTransform(unmask, this.mask, this.mapTokens)
-      } else {
-        const masked = maskTransform(clipboard, this.mask, this.mapTokens)
-        text =
-          masked.length === this.mask.length
-            ? masked
-            : maskTransform(
-                unmaskTransform(clipboard, this.mask, false, this.mapTokens),
-                this.mask,
-                this.mapTokens
-              )
-      }
+  onKeyDown = (event: KeyboardInputEvent) => {
+    const key = event.key
+    if (!this.isKeyboardEvent && PRESSED_KEYS.includes(key)) {
+      this.isKeyboardEvent = true
     }
+    if (this.isKeyboardEvent && GHOST_COMBO_KEYS.includes(key)) {
+      return
+    }
+    if (!this.isKeyboardEvent && !GHOST_KEYS.includes(key)) {
+      event.preventDefault()
+    }
+    if (
+      !GHOST_KEYS.includes(key) &&
+      !BLOCKED_KEYS.includes(key) &&
+      !this.isKeyboardEvent
+    ) {
+      const selectionIndex = event.target.selectionStart || 0
+      const value = event.target.value
+      const { text, index } = this.getValueAndIndexAfterInsertAt(
+        value,
+        selectionIndex,
+        key
+      )
+      this.refreshInput(text, event, index, this.shouldUnmask)
+      this.formatAndEmit(text)
+    }
+  }
+
+  onPaste = async (event: ClipboardInputEvent) => {
+    const selectionIndex = event.target.selectionStart || 0
+    const value = event.target.value
+    const nextToken = this.maskService.getNextMaskKey(value)
+    const indexToAppend =
+      nextToken?.index || 0 > selectionIndex
+        ? selectionIndex
+        : nextToken?.index || 0
+    const clipboard = await navigator.clipboard.readText()
+    const { text, index } = this.getValueAndIndexAfterInsertAt(
+      value,
+      indexToAppend,
+      clipboard
+    )
+    this.refreshInput(text, event, index)
+    this.formatAndEmit(text)
+  }
+
+  onMouseEvent = (event: MouseEvent & EventInputTarget) => {
+    const text = this.shouldUnmask
+      ? event.target.value
+      : this.maskService.unmaskTransform(event.target.value)
+    const newSelectionIndex = event.target.selectionEnd || 0
     this.refreshInput(
-      maskTransform(text, this.mask, this.mapTokens),
+      this.maskService.maskTransform(text),
       event,
-      event.target.selectionEnd
+      newSelectionIndex
     )
   }
 
   initListeners() {
-    this.inputElement.onkeyup = this.onKeyUp
-    this.inputElement.onkeydown = this.onKeyDown
-    this.inputElement.onpaste = this.inputElement.onblur = this.inputElement.onfocus = this.inputElement.onclick = this.onPaste
+    this.inputElement.onkeyup = this.onKeyUp as any
+    this.inputElement.onkeydown = this.onKeyDown as any
+    this.inputElement.onpaste = this.onPaste as any
+    this.inputElement.onblur = this.inputElement.onfocus = this.inputElement.onclick = this
+      .onMouseEvent as any
   }
 
   formatAndEmit(text: string) {
     let valueToEmit: string | number = text
     if (this.shouldUnmask) {
-      valueToEmit = unmaskTransform(
-        text,
-        this.mask,
-        this.parseint,
-        this.mapTokens
-      )
+      valueToEmit = this.maskService.unmaskTransform(text)
     }
     if (!this.parseint || !isNaN(valueToEmit as number)) {
       this.updateModel(valueToEmit)
@@ -290,121 +298,99 @@ class InputMask {
   }
 }
 
-export function maskTransform(
-  value: string | number,
-  mask: string,
-  mapTokens: IMASK_TOKEN_PATTERN = MASK_TOKEN_PATTERN
-) {
-  const text = (value || '') + ''
-  let maskedInput = trimMaskedText(mask, 0, mapTokens)
-  for (let i = 0; i < text.length; i++) {
-    const char = text[i]
-    const nextMaskKey = getNextMaskKey(maskedInput, mask, mapTokens)
-    if (nextMaskKey) {
-      const { token, index: tokenIndex } = nextMaskKey
-      if (char?.match(mapTokens[token])) {
-        maskedInput = replaceAtRange(maskedInput, char, tokenIndex)
+class MaskLogic {
+  constructor(
+    private mask: string,
+    private mapTokens = MASK_TOKEN_PATTERN,
+    private parseToInt = false
+  ) {}
+
+  maskTransform(value: string | number) {
+    const text = (value || '') + ''
+    let maskedInput = this.trimMaskedText(this.mask, 0)
+    for (let i = 0; i < text.length; i++) {
+      const char = text[i]
+      const nextMaskKey = this.getNextMaskKey(maskedInput)
+      if (nextMaskKey) {
+        const { token, index: tokenIndex } = nextMaskKey
+        if (char.match(this.mapTokens[token])) {
+          maskedInput = this.replaceAtRange(maskedInput, char, tokenIndex)
+        }
+      } else {
+        break
       }
-    } else {
-      break
     }
+    return maskedInput
   }
-  return maskedInput
-}
 
-function trimMaskedText(
-  maskedText: string,
-  startIndex: number,
-  mapTokens: IMASK_TOKEN_PATTERN = MASK_TOKEN_PATTERN
-) {
-  let newText = maskedText
-  for (let i = startIndex; i < maskedText.length; i++) {
-    const char = maskedText[i]
-    if (mapTokens[char]) {
-      newText = replaceAtRange(newText, ' ', i)
+  trimMaskedText(maskedText: string, startIndex: number) {
+    let newText = maskedText
+    for (let i = startIndex; i < maskedText.length; i++) {
+      const char = maskedText[i]
+      if (this.mapTokens[char]) {
+        newText = this.replaceAtRange(newText, ' ', i)
+      }
     }
+    return newText
   }
-  return newText
-}
 
-function getNextMaskKey(
-  value: string,
-  mask: string,
-  mapTokens: IMASK_TOKEN_PATTERN = MASK_TOKEN_PATTERN
-) {
-  for (let i = 0; i < value.length; i++) {
-    if (value[i] === ' ' && mapTokens[mask[i]]) {
-      return {
-        token: mask[i],
-        index: i,
+  getNextMaskKey(value: string) {
+    for (let i = 0; i < value.length; i++) {
+      if (value[i] === ' ' && this.mapTokens[this.mask[i]]) {
+        return {
+          token: this.mask[i],
+          index: i
+        }
       }
     }
   }
-}
 
-function onClickInput(
-  value: string,
-  mask: string,
-  selectionIndex: number,
-  mapTokens: IMASK_TOKEN_PATTERN = MASK_TOKEN_PATTERN
-) {
-  const nextMaskKey = getNextMaskKey(value, mask, mapTokens)
-  return {
-    selectionIndex: nextMaskKey?.index || selectionIndex,
-  }
-}
-
-function onAddCharToMask(
-  value: string,
-  mask: string,
-  selectionIndex: number,
-  key: string,
-  mapTokens: IMASK_TOKEN_PATTERN = MASK_TOKEN_PATTERN
-) {
-  let newValue = value
-  let newSelectionIndex = selectionIndex
-  const nextMaskKey = getNextMaskKey(value, mask, mapTokens)
-  if (nextMaskKey) {
-    const { token, index } = nextMaskKey
-    const pattern = mapTokens[token]
-    if (pattern && key?.match(pattern)) {
-      newValue = replaceAtRange(newValue, key, index)
-      newSelectionIndex = index + 1
+  onClickInput(value: string, selectionIndex: number) {
+    const nextMaskKey = this.getNextMaskKey(value)
+    return {
+      selectionIndex: nextMaskKey?.index || selectionIndex
     }
   }
-  return {
-    value: newValue,
-    selectionIndex: newSelectionIndex,
-  }
-}
 
-function replaceAtRange(
-  origString: string,
-  replaceChar: string,
-  indexStart: number,
-  indexEnd = -1
-) {
-  return (
-    origString.substr(0, indexStart) +
-    replaceChar +
-    origString.substr(indexEnd === -1 ? indexStart + 1 : indexEnd)
-  )
+  replaceAtRange(
+    origString: string,
+    replaceChar: string,
+    indexStart: number,
+    indexEnd = -1
+  ) {
+    return (
+      origString.substr(0, indexStart) +
+      replaceChar +
+      origString.substr(indexEnd === -1 ? indexStart + 1 : indexEnd)
+    )
+  }
+
+  unmaskTransform(text: string) {
+    let newText = ''
+    for (let i = 0; i < this.mask.length; i++) {
+      const pattern = this.mapTokens[this.mask[i]]
+      if (pattern) {
+        if (text[i]?.match(pattern)) {
+          newText += text[i]
+        }
+      }
+    }
+    return this.parseToInt ? parseInt(newText) : newText
+  }
 }
 
 export function unmaskTransform(
-  text: string,
   mask: string,
-  parseToInt = false,
-  mapTokens: IMASK_TOKEN_PATTERN = MASK_TOKEN_PATTERN
+  mapTokens = MASK_TOKEN_PATTERN,
+  parseToInt = false
 ) {
-  let newText = ''
-  for (let i = 0; i < mask.length; i++) {
-    const pattern = mapTokens[mask[i]]
-    if (pattern) {
-      if (text[i]?.match(pattern)) {
-        newText += text[i]
-      }
-    }
-  }
-  return parseToInt ? parseInt(newText) : newText
+  return new MaskLogic(mask, mapTokens, parseToInt).unmaskTransform
+}
+
+export function maskTransform(
+  mask: string,
+  mapTokens = MASK_TOKEN_PATTERN,
+  parseToInt = false
+) {
+  return new MaskLogic(mask, mapTokens, parseToInt).maskTransform
 }

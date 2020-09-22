@@ -1,4 +1,10 @@
-# v1.0.15
+# v1.0.16
+
+- Fix paste problems
+- Fix type on any selection index
+- Update Refactor
+
+## v1.0.15
 
 - Fix special characters problem
 
