@@ -251,10 +251,12 @@ class InputMaskDOMManiputalion {
     const selectionIndex = event.target.selectionStart || 0
     const value = event.target.value
     const nextToken = this.maskService.getNextMaskKey(value)
+    const nextTokenIndex = nextToken?.index
+
     const indexToAppend =
-      nextToken?.index || 0 > selectionIndex
+      nextTokenIndex || 0 > selectionIndex
         ? selectionIndex
-        : nextToken?.index || 0
+        : nextTokenIndex || selectionIndex
     const clipboard = await navigator.clipboard.readText()
     const { text, index } = this.getValueAndIndexAfterInsertAt(
       value,

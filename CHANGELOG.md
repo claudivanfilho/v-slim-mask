@@ -1,4 +1,9 @@
-# v1.0.16
+# v1.0.17
+
+- Fix on paste with no next token value
+- Update documentation
+
+## v1.0.16
 
 - Fix paste problems
 - Fix type on any selection index

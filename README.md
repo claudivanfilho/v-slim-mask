@@ -1,6 +1,6 @@
 # V-SLIM-MASK
 
-A incredibly lighter input mask directive and filter compatible with **Vue 3**
+A incredibly **LIGHTER** input mask directive and filter compatible with **Vue 3**
 
 <!-- ![github start](https://badgen.net/github/stars/claudivanfilho/v-mask-directive-filter) -->
 
@@ -21,8 +21,6 @@ or
 $ npm install --save v-slim-mask
 ```
 
-### Directive
-
 ```javascript
 // Import the directive inside your main.(js|ts)
 
@@ -31,18 +29,30 @@ import { VMaskDirective } from 'v-slim-mask'
 createApp(App).directive('mask', VMaskDirective).mount('#app')
 ```
 
+or
+
+```javascript
+// using a custom directive
+
+import { getCustomMaskDirective } from 'v-slim-mask'
+
+const VMASKCustomDirective = getCustomMaskDirective({
+  '#': /[0-9]/,
+  Z: /[a-z]|[A-Z]/,
+})
+createApp(App).directive('mask', VMASKCustomDirective).mount('#app')
+```
+
 ## Config
 
 ### Tokens
 
-| Token | Pattern                 | Description       |
-| ----- | ----------------------- | ----------------- |
-| N     | [0-9]                   | numbers only      |
-| S     | [a-z] \| [A-Z]          | string a-z only   |
-| A     | [0-9] \| [a-z] \| [A-Z] | alphanumeric only |
-| X     | .\*                     | any char          |
-
-#### OBS: You can pass your own token pattern map through the method **getMaskDirectiveCustom**
+| Token | Pattern                 | Description            |
+| ----- | ----------------------- | ---------------------- |
+| N     | [0-9]                   | numbers only           |
+| S     | [a-z] \| [A-Z]          | string a-z or A-Z only |
+| A     | [0-9] \| [a-z] \| [A-Z] | alphanumeric only      |
+| X     | .\*                     | any character          |
 
 ### Modifiers
 
@@ -50,7 +60,7 @@ createApp(App).directive('mask', VMaskDirective).mount('#app')
 | ------------- | ------- | ------------------------------------------ |
 | unmask        | false   | unmask the return value to the model       |
 | parseint      | false   | parse to int the return value to the model |
-| init-change   | false   | set a initial value to the model on start  |
+| init-change   | false   | apply the mask to the model on start       |
 | hide-on-empty | false   | hide the mask if no value                  |
 
 ## Usage
