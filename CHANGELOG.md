@@ -1,4 +1,8 @@
-# v1.0.17
+# v1.0.18
+
+- Fix mobile
+
+## v1.0.17
 
 - Fix on paste with no next token value
 - Update documentation
