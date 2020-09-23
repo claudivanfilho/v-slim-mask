@@ -254,7 +254,15 @@ class MaskLogic {
   }
 
   unmaskTransform(text: string) {
-    const newText = this.unmaskToString(text)
+    let newText = ''
+    for (let i = 0; i < this.mask.length; i++) {
+      const pattern = this.mapTokens[this.mask[i]]
+      if (pattern) {
+        if (text[i]?.match(pattern)) {
+          newText += text[i]
+        }
+      }
+    }
     return this.parseToInt ? parseInt(newText) : newText
   }
 }
