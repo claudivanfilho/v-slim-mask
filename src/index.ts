@@ -74,7 +74,7 @@ export const VMaskDirective: Directive = getCustomMaskDirective()
 class InputMaskDOMManiputalion {
   private maskService: MaskLogic
   constructor(
-    mapTokens = MASK_TOKEN_PATTERN,
+    private mapTokens = MASK_TOKEN_PATTERN,
     private inputElement: HTMLInputElement,
     private mask: string,
     private shouldUnmask: boolean,
@@ -85,7 +85,7 @@ class InputMaskDOMManiputalion {
   ) {
     this.maskService = new MaskLogic(mask, mapTokens, parseint)
     const masked = this.maskService.maskTransform(inputElement.value)
-    this.refreshInput(masked, null, 0, true)
+    this.refreshInput(masked, inputElement)
     if (initChange) {
       this.formatAndEmit(masked)
     }
@@ -94,108 +94,65 @@ class InputMaskDOMManiputalion {
 
   refreshInput(
     text: string,
-    event?:
-      | MouseInputEvent
-      | FocusInputEvent
-      | InputEvent
-      | ClipboardInputEvent
-      | null,
-    selectionIndex = 0,
-    putIntoTimeout = false
+    inputElement: HTMLInputElement,
+    selectionIndex = 0
   ) {
     const hasModifications =
       text !== this.maskService.trimMaskedText(this.mask, 0)
     const mustUpdate = !this.hideOnEmpty || hasModifications
-    const eventType = event?.type
     const action = () => {
-      const inputElement: HTMLInputElement =
-        (event?.target as HTMLInputElement) || this.inputElement
       inputElement.value = mustUpdate ? text : ''
       inputElement.selectionStart = selectionIndex
       inputElement.selectionEnd = selectionIndex
     }
-    if (putIntoTimeout || (!mustUpdate && eventType === 'keyup')) {
-      setTimeout(() => action(), 0)
-    } else {
-      action()
-    }
+    setTimeout(() => action(), 0)
   }
 
-  onDeleteSelection = (value: string, start: number, length: number) => {
-    const newText = this.maskService.replaceAtRange(
-      value,
-      Array(length).fill(' ').join(''),
-      start,
-      start + length
-    )
-    const unmasked = this.maskService.unmaskToString(newText)
-    return this.maskService.maskTransform(unmasked)
+  remask(text: string) {
+    return this.maskService.maskTransform(this.maskService.unmaskToString(text))
   }
 
   onInput = (event: InputEvent) => {
     event.preventDefault()
-    const key = event.data || ''
     const target: HTMLInputElement | null = event?.target as HTMLInputElement
     const value = target.value
     const start = target.selectionStart || 0
-    const end = target.selectionEnd || 0
-    const diff = Math.abs(start - end)
-    const isNotSelectionEvent = diff === 0
+    let finalValue = this.remask(value)
+    let newSelectionIndex = this.maskService.getNextMaskKey(
+      this.remask(value.substring(0, start))
+    )
     if (DELETE_EVENTS.includes(event.inputType)) {
-      if (target.selectionStart === 0 && isNotSelectionEvent) {
-        return
-      }
-      let newSelectionStart = (start && start - 1) || 0
-      let finalText = ''
-      if (isNotSelectionEvent) {
-        const usmaskkedAll = this.maskService.unmaskToString(value)
-        const unmaskedUntilStart = this.maskService.unmaskToString(
-          value.substring(0, start)
-        )
-        const unmaskedRest = usmaskkedAll.substr(unmaskedUntilStart.length)
-        const textDeleted = unmaskedUntilStart.substring(
-          0,
-          unmaskedUntilStart.length - 1
-        )
-        const nextToken = this.maskService.getNextMaskKey(
-          this.maskService.maskTransform(textDeleted)
-        )
-        if (nextToken?.index !== undefined) {
-          newSelectionStart = nextToken?.index
-        }
-        finalText = this.maskService.maskTransform(textDeleted + unmaskedRest)
-      } else {
-        finalText = this.onDeleteSelection(value, start, diff)
-        newSelectionStart = start
-      }
-      this.refreshInput(finalText, event, newSelectionStart, this.shouldUnmask)
-      const unmasked = this.maskService.unmaskTransform(finalText)
-      this.formatAndEmit(this.hideOnEmpty && !unmasked ? '' : finalText)
-    } else {
-      let newValue = value
-      if (diff) {
-        newValue = this.onDeleteSelection(value, start, diff)
-      }
-      const { text, index } = this.maskService.getValueAndIndexAfterInsertAt(
-        (this.hideOnEmpty &&
-          !newValue &&
-          this.maskService.trimMaskedText(this.mask, 0)) ||
-          newValue,
-        start,
-        key
+      let replaced = finalValue
+      newSelectionIndex = this.maskService.getLastMaskIndex(
+        finalValue,
+        start - 1
       )
-      this.refreshInput(text, event, index, this.shouldUnmask)
-      this.formatAndEmit(text)
+      if (event.inputType === 'deleteContentBackward') {
+        if (this.mask[start] && !this.mapTokens[this.mask[start]]) {
+          replaced = this.maskService.replaceAtRange(
+            finalValue,
+            ' ',
+            newSelectionIndex
+          )
+          finalValue = this.remask(replaced)
+        }
+      }
+      newSelectionIndex =
+        this.maskService.getLastMaskIndex(replaced, start - 1) + 1
     }
+    this.refreshInput(finalValue, target, newSelectionIndex)
+    this.formatAndEmit(finalValue)
   }
 
   initListeners() {
-    this.inputElement.addEventListener('beforeinput', this.onInput as any)
+    this.inputElement.addEventListener('input', this.onInput as any)
   }
 
   formatAndEmit(text: string) {
     let valueToEmit: string | number = text
-    if (this.shouldUnmask) {
+    if (this.hideOnEmpty && text === this.mask) {
+      valueToEmit = ''
+    } else if (this.shouldUnmask) {
       valueToEmit = this.maskService.unmaskTransform(text)
     }
     if (!this.parseint || !isNaN(valueToEmit as number)) {
@@ -216,16 +173,17 @@ class MaskLogic {
   maskTransform(value: string | number) {
     const text = (value || '') + ''
     let maskedInput = this.trimMaskedText(this.mask, 0)
-    for (let i = 0; i < text.length; i++) {
-      const char = text[i]
-      const nextMaskKey = this.getNextMaskKey(maskedInput)
-      if (nextMaskKey) {
-        const { token, index: tokenIndex } = nextMaskKey
-        if (char.match(this.mapTokens[token])) {
-          maskedInput = this.replaceAtRange(maskedInput, char, tokenIndex)
+    let lastIndex = 0
+    for (let i = 0; i < this.mask.length; i++) {
+      const pattern = this.mapTokens[this.mask[i]]
+      if (pattern) {
+        for (let j = lastIndex; j < text.length; j++) {
+          if (text[j].match(pattern)) {
+            maskedInput = this.replaceAtRange(maskedInput, text[j], i)
+            lastIndex = j + 1
+            break
+          }
         }
-      } else {
-        break
       }
     }
     return maskedInput
@@ -245,12 +203,24 @@ class MaskLogic {
   getNextMaskKey(value: string) {
     for (let i = 0; i < value.length; i++) {
       if (value[i] === ' ' && this.mapTokens[this.mask[i]]) {
-        return {
-          token: this.mask[i],
-          index: i,
+        return i
+      }
+    }
+    return value.length
+  }
+
+  getLastMaskIndex(value: string, fromIndex: number) {
+    let lastMaskIndex = 0
+    for (let i = fromIndex; i >= 0; i--) {
+      const pattern = this.mapTokens[this.mask[i]]
+      if (pattern) {
+        lastMaskIndex = i
+        if (value[i].match(pattern)) {
+          return i
         }
       }
     }
+    return lastMaskIndex
   }
 
   replaceAtRange(
@@ -266,42 +236,17 @@ class MaskLogic {
     )
   }
 
-  appendTextAtIndex(originalText: string, text: string, index: number) {
-    return (
-      originalText.substring(0, index) + text + originalText.substring(index)
-    )
-  }
-
-  getValueAndIndexAfterInsertAt(
-    text: string,
-    index: number,
-    textToInsert: string
-  ) {
-    const unmaskAll = this.unmaskToString(text)
-    const unmaskUntilIndex = this.unmaskToString(text.substr(0, index))
-    const maskedUntilIndexWithChar = this.maskTransform(
-      unmaskUntilIndex + textToInsert
-    )
-    const valueWithChar = this.appendTextAtIndex(
-      unmaskAll,
-      textToInsert,
-      unmaskUntilIndex.length
-    )
-    const newValue = this.maskTransform(valueWithChar)
-    const nextkey = this.getNextMaskKey(maskedUntilIndexWithChar)
-    return {
-      index: nextkey?.index || this.mask.length,
-      text: newValue,
-    }
-  }
-
   unmaskToString(text: string) {
     let newText = ''
+    let lastValueIndex = 0
     for (let i = 0; i < this.mask.length; i++) {
       const pattern = this.mapTokens[this.mask[i]]
       if (pattern) {
-        if (text[i]?.match(pattern)) {
-          newText += text[i]
+        for (let j = lastValueIndex; j < text.length; j++) {
+          if (text[j]?.match(pattern)) {
+            newText += text[j]
+            lastValueIndex = j + 1
+          }
         }
       }
     }
