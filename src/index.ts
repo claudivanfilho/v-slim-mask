@@ -9,7 +9,7 @@ export const MASK_TOKEN_PATTERN: IMASK_TOKEN_PATTERN = {
   S: /[a-z]|[A-Z]/,
   A: /[0-9]|[a-z]|[A-Z]/,
   C: /[^ ]/,
-  X: /.*/
+  X: /.*/,
 }
 export type MASK_TOKEN = keyof typeof MASK_TOKEN_PATTERN
 interface InputEvent extends Event {
@@ -67,7 +67,7 @@ export function getCustomMaskDirective(
           }
         }
       )
-    }
+    },
   }
 }
 
@@ -77,7 +77,7 @@ class InputMaskDOMManiputalion {
   private maskService: MaskLogic
   private lastValue = ''
   constructor(
-    mapTokens = MASK_TOKEN_PATTERN,
+    private mapTokens = MASK_TOKEN_PATTERN,
     private inputElement: HTMLInputElement,
     private mask: string,
     private shouldUnmask: boolean,
@@ -132,13 +132,23 @@ class InputMaskDOMManiputalion {
   onInput = (event: any) => {
     const target: HTMLInputElement | null = event.target as HTMLInputElement
     const value = target.value
+    const start = target.selectionStart || 0
+    const isComposition = event.inputType === 'insertCompositionText'
     let finalValue = this.remask(value, event.inputType === 'insertFromPaste')
     if (event.inputType === 'deleteContentBackward') {
       if (finalValue === this.lastValue) {
         finalValue = this.popValue(finalValue)
       }
     }
-    if (!(event.inputType === 'insertCompositionText' && !this.isMobile())) {
+    const pattern = this.mapTokens[this.mask[start - 1]]
+    if (
+      finalValue !== value &&
+      isComposition &&
+      pattern &&
+      !value[start - 1].match(pattern)
+    ) {
+      this.refreshInput(finalValue)
+    } else if (!(isComposition && !this.isMobile())) {
       this.refreshInput(finalValue)
     }
     this.formatAndEmit(finalValue)
@@ -149,7 +159,7 @@ class InputMaskDOMManiputalion {
   initListeners() {
     this.inputElement.oninput = this.onInput
     this.inputElement.onclick = this.onClick
-    this.inputElement.onkeyup = e => {
+    this.inputElement.onkeyup = (e) => {
       if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
         this.onClick(e)
       }

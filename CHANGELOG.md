@@ -1,4 +1,8 @@
-# v1.0.21
+# v1.0.22
+
+- Fix dead key
+
+## v1.0.21
 
 - Fix dead key
 
