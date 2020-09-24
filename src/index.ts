@@ -135,7 +135,7 @@ class InputMaskDOMManiputalion {
     const start = target.selectionStart || 0
     const isComposition = event.inputType === 'insertCompositionText'
     let finalValue = this.remask(value, event.inputType === 'insertFromPaste')
-    if (event.inputType === 'deleteContentBackward') {
+    if (event.inputType === 'deleteContentBackward' || this.hideOnEmpty) {
       if (finalValue === this.lastValue) {
         finalValue = this.popValue(finalValue)
       }
@@ -168,7 +168,10 @@ class InputMaskDOMManiputalion {
 
   formatAndEmit(text: string) {
     let valueToEmit: string | number = text
-    if (this.hideOnEmpty && text === this.mask) {
+    if (
+      this.hideOnEmpty &&
+      text === this.maskService.trimMaskedText(this.mask, 0)
+    ) {
       valueToEmit = ''
     } else if (this.shouldUnmask) {
       valueToEmit = this.maskService.unmaskTransform(text)

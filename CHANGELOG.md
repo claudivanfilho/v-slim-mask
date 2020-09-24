@@ -1,4 +1,8 @@
-# v1.0.22
+# v1.0.24
+
+- Fix hide on empty
+
+## v1.0.23
 
 - Fix dead key
 

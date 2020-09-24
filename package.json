@@ -1,6 +1,6 @@
 {
   "name": "v-slim-mask",
-  "version": "1.0.23",
+  "version": "1.0.24",
   "description": "A input mask directtive compatible with Vue 3 (~1.5kb)",
   "main": "dist/index.js",
   "scripts": {

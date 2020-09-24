@@ -58,8 +58,8 @@ createApp(App).directive('mask', VMASKCustomDirective).mount('#app')
 | N     | [0-9]                   | numbers only           |
 | S     | [a-z] \| [A-Z]          | string a-z or A-Z only |
 | A     | [0-9] \| [a-z] \| [A-Z] | alphanumeric only      |
-| C     | [^ ]                    | required character     |
-| X     | .\*                     | optional character     |
+| C     | [^ ]                    | required char          |
+| X     | .\*                     | optional char          |
 
 ### Modifiers
 
