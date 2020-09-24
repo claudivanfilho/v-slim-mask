@@ -1,4 +1,8 @@
-# v1.0.19
+# v1.0.20
+
+- Fix dead key
+
+## v1.0.19
 
 - Fix firefox
 

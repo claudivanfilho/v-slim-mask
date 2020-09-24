@@ -10,6 +10,7 @@ src
 .travis.yml
 babel.config.js
 CHANGELOG.md
+README.md
 jestconfig.json
 tsconfig.json
 tslint.json

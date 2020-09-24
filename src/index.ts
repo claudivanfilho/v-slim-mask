@@ -1,13 +1,5 @@
 import { Directive } from 'vue'
 
-interface EventInputTarget {
-  target: HTMLInputElement
-}
-
-type FocusInputEvent = Omit<FocusEvent, 'target'> & EventInputTarget
-type MouseInputEvent = Omit<MouseEvent, 'target'> & EventInputTarget
-type ClipboardInputEvent = Omit<ClipboardEvent, 'target'> & EventInputTarget
-
 export type IMASK_TOKEN_PATTERN = {
   [key: string]: RegExp
 }
@@ -16,10 +8,13 @@ export const MASK_TOKEN_PATTERN: IMASK_TOKEN_PATTERN = {
   N: /[0-9]/,
   S: /[a-z]|[A-Z]/,
   A: /[0-9]|[a-z]|[A-Z]/,
-  X: /.*/,
+  C: /[^ ]/,
+  X: /.*/
 }
 export type MASK_TOKEN = keyof typeof MASK_TOKEN_PATTERN
-const DELETE_EVENTS = ['deleteContentBackward', 'deleteByCut']
+interface InputEvent extends Event {
+  inputType?: string
+}
 
 export function getCustomMaskDirective(
   mapTokens = MASK_TOKEN_PATTERN
@@ -41,6 +36,7 @@ export function getCustomMaskDirective(
       if (!mask) {
         throw new Error('Mask not provided')
       }
+
       new InputMaskDOMManiputalion(
         mapTokens,
         inputElement,
@@ -49,23 +45,29 @@ export function getCustomMaskDirective(
         Boolean(parseint),
         hideOnEmpty,
         initChange,
-        (value: string | number) => {
+        (value: string | number, returnValue?: boolean) => {
           if (
             bindings.instance.$data &&
             bindings.instance.$data[model] !== undefined
           ) {
-            bindings.instance.$data[model] = value
+            return returnValue
+              ? bindings.instance.$data[model]
+              : (bindings.instance.$data[model] = value)
           } else if (bindings.instance[model] !== undefined) {
-            bindings.instance[model] = value
+            return returnValue
+              ? bindings.instance[model]
+              : (bindings.instance[model] = value)
           } else if (
             bindings.instance.state &&
             bindings.instance.state[model] !== undefined
           ) {
-            bindings.instance.state[model] = value
+            return returnValue
+              ? bindings.instance.state[model]
+              : (bindings.instance.state[model] = value)
           }
         }
       )
-    },
+    }
   }
 }
 
@@ -73,79 +75,85 @@ export const VMaskDirective: Directive = getCustomMaskDirective()
 
 class InputMaskDOMManiputalion {
   private maskService: MaskLogic
+  private lastValue = ''
   constructor(
-    private mapTokens = MASK_TOKEN_PATTERN,
+    mapTokens = MASK_TOKEN_PATTERN,
     private inputElement: HTMLInputElement,
     private mask: string,
     private shouldUnmask: boolean,
     private parseint: boolean,
     private hideOnEmpty: boolean,
     initChange: boolean,
-    private updateModel: (value: string | number) => void
+    private modelHandler: (value: string | number, returnValue?: boolean) => any
   ) {
     this.maskService = new MaskLogic(mask, mapTokens, parseint)
-    const masked = this.maskService.maskTransform(inputElement.value)
-    this.refreshInput(masked, inputElement)
+    const masked = this.maskService.maskTransform(modelHandler('', true))
+    this.refreshInput(masked)
     if (initChange) {
       this.formatAndEmit(masked)
     }
     this.initListeners()
   }
 
-  refreshInput(
-    text: string,
-    inputElement: HTMLInputElement,
-    selectionIndex = 0
-  ) {
+  refreshInput(text: string) {
+    const index = this.maskService.getNextMaskIndex(text)
     const hasModifications =
       text !== this.maskService.trimMaskedText(this.mask, 0)
     const mustUpdate = !this.hideOnEmpty || hasModifications
     const action = () => {
-      inputElement.value = mustUpdate ? text : ''
-      inputElement.selectionStart = selectionIndex
-      inputElement.selectionEnd = selectionIndex
+      this.inputElement.value = mustUpdate ? text : ''
+      this.inputElement.selectionStart = index
+      this.inputElement.selectionEnd = index
+      this.lastValue = this.inputElement.value
     }
-    setTimeout(() => action(), 0)
+    if (this.isMobile()) {
+      setTimeout(() => action(), 0)
+    } else {
+      action()
+    }
   }
 
-  remask(text: string) {
-    return this.maskService.maskTransform(this.maskService.unmaskToString(text))
-  }
-
-  onInput = (event: InputEvent) => {
-    event.preventDefault()
-    const target: HTMLInputElement | null = event?.target as HTMLInputElement
-    const value = target.value
-    const start = target.selectionStart || 0
-    let finalValue = this.remask(value)
-    let newSelectionIndex = this.maskService.getNextMaskKey(
-      this.remask(value.substring(0, start))
+  remask(text: string, fromUnmasked = true) {
+    return this.maskService.maskTransform(
+      this.maskService.unmaskTransform(text, fromUnmasked, false)
     )
-    if (DELETE_EVENTS.includes(event.inputType)) {
-      let replaced = finalValue
-      newSelectionIndex = this.maskService.getLastMaskIndex(
-        finalValue,
-        start - 1
-      )
-      if (event.inputType === 'deleteContentBackward') {
-        if (this.mask[start] && !this.mapTokens[this.mask[start]]) {
-          replaced = this.maskService.replaceAtRange(
-            finalValue,
-            ' ',
-            newSelectionIndex
-          )
-          finalValue = this.remask(replaced)
-        }
+  }
+
+  popValue(text: string) {
+    const unmasked = this.maskService.unmaskTransform(text, false) as string
+    return this.maskService.maskTransform(unmasked.slice(0, -1))
+  }
+
+  isMobile = () =>
+    /\b(BlackBerry|webOS|iPhone|IEMobile|Android|Windows Phone|iPad|iPod)\b/i.test(
+      navigator.userAgent
+    )
+
+  onInput = (event: any) => {
+    const target: HTMLInputElement | null = event.target as HTMLInputElement
+    const value = target.value
+    let finalValue = this.remask(value, event.inputType === 'insertFromPaste')
+    if (event.inputType === 'deleteContentBackward') {
+      if (finalValue === this.lastValue) {
+        finalValue = this.popValue(finalValue)
       }
-      newSelectionIndex =
-        this.maskService.getLastMaskIndex(replaced, start - 1) + 1
     }
-    this.refreshInput(finalValue, target, newSelectionIndex)
+    if (!(event.inputType === 'insertCompositionText' && !this.isMobile())) {
+      this.refreshInput(finalValue)
+    }
     this.formatAndEmit(finalValue)
   }
 
+  onClick = (event: any) => this.refreshInput(event.target.value)
+
   initListeners() {
-    this.inputElement.addEventListener('input', this.onInput as any)
+    this.inputElement.oninput = this.onInput
+    this.inputElement.onclick = this.onClick
+    this.inputElement.onkeyup = e => {
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        this.onClick(e)
+      }
+    }
   }
 
   formatAndEmit(text: string) {
@@ -156,9 +164,9 @@ class InputMaskDOMManiputalion {
       valueToEmit = this.maskService.unmaskTransform(text)
     }
     if (!this.parseint || !isNaN(valueToEmit as number)) {
-      this.updateModel(valueToEmit)
+      this.modelHandler(valueToEmit)
     } else if (this.parseint && isNaN(valueToEmit as number)) {
-      this.updateModel('')
+      this.modelHandler('')
     }
   }
 }
@@ -200,27 +208,13 @@ class MaskLogic {
     return newText
   }
 
-  getNextMaskKey(value: string) {
+  getNextMaskIndex(value: string) {
     for (let i = 0; i < value.length; i++) {
       if (value[i] === ' ' && this.mapTokens[this.mask[i]]) {
         return i
       }
     }
     return value.length
-  }
-
-  getLastMaskIndex(value: string, fromIndex: number) {
-    let lastMaskIndex = 0
-    for (let i = fromIndex; i >= 0; i--) {
-      const pattern = this.mapTokens[this.mask[i]]
-      if (pattern) {
-        lastMaskIndex = i
-        if (value[i].match(pattern)) {
-          return i
-        }
-      }
-    }
-    return lastMaskIndex
   }
 
   replaceAtRange(
@@ -236,34 +230,30 @@ class MaskLogic {
     )
   }
 
-  unmaskToString(text: string) {
+  unmaskTransform(text: string, fromUnmasked = false, useParseInt = true) {
     let newText = ''
     let lastValueIndex = 0
     for (let i = 0; i < this.mask.length; i++) {
       const pattern = this.mapTokens[this.mask[i]]
       if (pattern) {
-        for (let j = lastValueIndex; j < text.length; j++) {
-          if (text[j]?.match(pattern)) {
-            newText += text[j]
-            lastValueIndex = j + 1
+        if (fromUnmasked) {
+          for (let j = lastValueIndex; j < text.length; j++) {
+            if (text[j]?.match(pattern)) {
+              newText += text[j]
+              lastValueIndex = j + 1
+            }
+          }
+        } else {
+          if (text[i]?.match(pattern)) {
+            newText += text[i]
           }
         }
       }
     }
-    return newText
-  }
-
-  unmaskTransform(text: string) {
-    let newText = ''
-    for (let i = 0; i < this.mask.length; i++) {
-      const pattern = this.mapTokens[this.mask[i]]
-      if (pattern) {
-        if (text[i]?.match(pattern)) {
-          newText += text[i]
-        }
-      }
+    if (useParseInt) {
+      return this.parseToInt ? parseInt(newText) : newText
     }
-    return this.parseToInt ? parseInt(newText) : newText
+    return newText
   }
 }
 
@@ -271,9 +261,13 @@ export function unmaskTransform(
   value: string,
   mask: string,
   mapTokens = MASK_TOKEN_PATTERN,
+  fromUnmasked = false,
   parseToInt = false
 ) {
-  return new MaskLogic(mask, mapTokens, parseToInt).unmaskTransform(value)
+  return new MaskLogic(mask, mapTokens, parseToInt).unmaskTransform(
+    value,
+    fromUnmasked
+  )
 }
 
 export function maskTransform(
